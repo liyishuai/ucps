@@ -3,14 +3,26 @@ Require Import Metalib.Metatheory.
 (** syntax *)
 Definition x := var. (*r variables *)
 
+Inductive p : Set :=  (*r primitives *)
+ | p_plus : p
+ | p_minus : p
+ | p_mult : p
+ | p_div : p.
+
+Definition G : Set := list x.
+
 Inductive e : Set :=  (*r expressions *)
  | e_var_b : nat -> e
  | e_var_f : x -> e
- | e_lam : e -> e
+ | e_zero : e
+ | e_succ : e -> e
  | e_app : e -> e -> e
+ | e_prim : e -> p -> e -> e
+ | e_lam : e -> e
+ | e_fix : e -> e
+ | e_ifz : e -> e -> e -> e
+ | e_let : e -> e -> e
  | e_halt : e -> e.
-
-Definition G : Set := list x.
 
 (* EXPERIMENTAL *)
 (** auxiliary functions on the new list types *)
@@ -18,21 +30,27 @@ Definition G : Set := list x.
 (** subrules *)
 (** arities *)
 (** opening up abstractions *)
-Fixpoint open_e_wrt_e_rec (k:nat) (e_6:e) (e__7:e) {struct e__7}: e :=
-  match e__7 with
+Fixpoint open_e_wrt_e_rec (k:nat) (e__6:e) (e___7:e) {struct e___7}: e :=
+  match e___7 with
   | (e_var_b nat) => 
       match lt_eq_lt_dec nat k with
         | inleft (left _) => e_var_b nat
-        | inleft (right _) => e_6
+        | inleft (right _) => e__6
         | inright _ => e_var_b (nat - 1)
       end
   | (e_var_f x5) => e_var_f x5
-  | (e_lam e5) => e_lam (open_e_wrt_e_rec (S k) e_6 e5)
-  | (e_app e1 e2) => e_app (open_e_wrt_e_rec k e_6 e1) (open_e_wrt_e_rec k e_6 e2)
-  | (e_halt e5) => e_halt (open_e_wrt_e_rec k e_6 e5)
+  | e_zero => e_zero 
+  | (e_succ e5) => e_succ (open_e_wrt_e_rec k e__6 e5)
+  | (e_app e1 e2) => e_app (open_e_wrt_e_rec k e__6 e1) (open_e_wrt_e_rec k e__6 e2)
+  | (e_prim e1 p5 e2) => e_prim (open_e_wrt_e_rec k e__6 e1) p5 (open_e_wrt_e_rec k e__6 e2)
+  | (e_lam e5) => e_lam (open_e_wrt_e_rec (S k) e__6 e5)
+  | (e_fix e5) => e_fix (open_e_wrt_e_rec (S k) e__6 e5)
+  | (e_ifz e_5 e0 e1) => e_ifz (open_e_wrt_e_rec k e__6 e_5) (open_e_wrt_e_rec k e__6 e0) (open_e_wrt_e_rec (S k) e__6 e1)
+  | (e_let e5 e') => e_let (open_e_wrt_e_rec k e__6 e5) (open_e_wrt_e_rec (S k) e__6 e')
+  | (e_halt e5) => e_halt (open_e_wrt_e_rec k e__6 e5)
 end.
 
-Definition open_e_wrt_e e_6 e__7 := open_e_wrt_e_rec 0 e__7 e_6.
+Definition open_e_wrt_e e__6 e___7 := open_e_wrt_e_rec 0 e___7 e__6.
 
 (** terms are locally-closed pre-terms *)
 (** definitions *)
@@ -41,97 +59,248 @@ Definition open_e_wrt_e e_6 e__7 := open_e_wrt_e_rec 0 e__7 e_6.
 Inductive lc_e : e -> Prop :=    (* defn lc_e *)
  | lc_e_var_f : forall (x5:x),
      (lc_e (e_var_f x5))
- | lc_e_lam : forall (e5:e),
-      ( forall x5 , lc_e  ( open_e_wrt_e e5 (e_var_f x5) )  )  ->
-     (lc_e (e_lam e5))
+ | lc_e_zero : 
+     (lc_e e_zero)
+ | lc_e_succ : forall (e5:e),
+     (lc_e e5) ->
+     (lc_e (e_succ e5))
  | lc_e_app : forall (e1 e2:e),
      (lc_e e1) ->
      (lc_e e2) ->
      (lc_e (e_app e1 e2))
+ | lc_e_prim : forall (e1:e) (p5:p) (e2:e),
+     (lc_e e1) ->
+     (lc_e e2) ->
+     (lc_e (e_prim e1 p5 e2))
+ | lc_e_lam : forall (e5:e),
+      ( forall x5 , lc_e  ( open_e_wrt_e e5 (e_var_f x5) )  )  ->
+     (lc_e (e_lam e5))
+ | lc_e_fix : forall (e5:e),
+      ( forall x5 , lc_e  ( open_e_wrt_e e5 (e_var_f x5) )  )  ->
+     (lc_e (e_fix e5))
+ | lc_e_ifz : forall (e_5 e0 e1:e),
+     (lc_e e_5) ->
+     (lc_e e0) ->
+      ( forall x5 , lc_e  ( open_e_wrt_e e1 (e_var_f x5) )  )  ->
+     (lc_e (e_ifz e_5 e0 e1))
+ | lc_e_let : forall (e5 e':e),
+     (lc_e e5) ->
+      ( forall x5 , lc_e  ( open_e_wrt_e e' (e_var_f x5) )  )  ->
+     (lc_e (e_let e5 e'))
  | lc_e_halt : forall (e5:e),
      (lc_e e5) ->
      (lc_e (e_halt e5)).
 (** free variables *)
-Fixpoint fv_e (e_6:e) : vars :=
-  match e_6 with
+Fixpoint fv_e (e__6:e) : vars :=
+  match e__6 with
   | (e_var_b nat) => {}
   | (e_var_f x5) => {{x5}}
-  | (e_lam e5) => (fv_e e5)
+  | e_zero => {}
+  | (e_succ e5) => (fv_e e5)
   | (e_app e1 e2) => (fv_e e1) \u (fv_e e2)
+  | (e_prim e1 p5 e2) => (fv_e e1) \u (fv_e e2)
+  | (e_lam e5) => (fv_e e5)
+  | (e_fix e5) => (fv_e e5)
+  | (e_ifz e_5 e0 e1) => (fv_e e_5) \u (fv_e e0) \u (fv_e e1)
+  | (e_let e5 e') => (fv_e e5) \u (fv_e e')
   | (e_halt e5) => (fv_e e5)
 end.
 
 (** substitutions *)
-Fixpoint subst_e (e_6:e) (x_6:x) (e__7:e) {struct e__7} : e :=
-  match e__7 with
+Fixpoint subst_e (e__6:e) (x_6:x) (e___7:e) {struct e___7} : e :=
+  match e___7 with
   | (e_var_b nat) => e_var_b nat
-  | (e_var_f x5) => (if eq_var x5 x_6 then e_6 else (e_var_f x5))
-  | (e_lam e5) => e_lam (subst_e e_6 x_6 e5)
-  | (e_app e1 e2) => e_app (subst_e e_6 x_6 e1) (subst_e e_6 x_6 e2)
-  | (e_halt e5) => e_halt (subst_e e_6 x_6 e5)
+  | (e_var_f x5) => (if eq_var x5 x_6 then e__6 else (e_var_f x5))
+  | e_zero => e_zero 
+  | (e_succ e5) => e_succ (subst_e e__6 x_6 e5)
+  | (e_app e1 e2) => e_app (subst_e e__6 x_6 e1) (subst_e e__6 x_6 e2)
+  | (e_prim e1 p5 e2) => e_prim (subst_e e__6 x_6 e1) p5 (subst_e e__6 x_6 e2)
+  | (e_lam e5) => e_lam (subst_e e__6 x_6 e5)
+  | (e_fix e5) => e_fix (subst_e e__6 x_6 e5)
+  | (e_ifz e_5 e0 e1) => e_ifz (subst_e e__6 x_6 e_5) (subst_e e__6 x_6 e0) (subst_e e__6 x_6 e1)
+  | (e_let e5 e') => e_let (subst_e e__6 x_6 e5) (subst_e e__6 x_6 e')
+  | (e_halt e5) => e_halt (subst_e e__6 x_6 e5)
 end.
 
 
 (** definitions *)
+
+(* defns V *)
+Inductive val : e -> Prop :=    (* defn val *)
+ | Val_zero : 
+     val e_zero
+ | Val_succ : forall (e5:e),
+     val e5 ->
+     val (e_succ e5)
+with eq : e -> p -> e -> e -> Prop :=    (* defn eq *)
+ | Arith_plus0 : forall (e5:e),
+     val e5 ->
+     eq e_zero p_plus e5 e5
+ | Arith_plus1 : forall (e1 e2 e3:e),
+     eq e1 p_plus e2 e3 ->
+     eq (e_succ e1) p_plus e2 (e_succ e3)
+ | Arith_minus0 : forall (e5:e),
+     val e5 ->
+     eq e5 p_minus e_zero e5
+ | Arith_minus1 : forall (e5:e),
+     val e5 ->
+     eq e_zero p_minus e5 e_zero
+ | Arith_minus2 : forall (e1 e2 e3:e),
+     eq e1 p_minus e2 e3 ->
+     eq (e_succ e1) p_minus (e_succ e2) e3
+ | Arith_mult0 : forall (e5:e),
+     val e5 ->
+     eq e_zero p_mult e5 e_zero
+ | Arith_mult1 : forall (e1 e2 e4 e3:e),
+     eq e1 p_mult e2 e3 ->
+     eq e2 p_plus e3 e4 ->
+     eq (e_succ e1) p_mult e2 e4
+ | Arith_div0 : forall (e5:e),
+     val e5 ->
+     eq e_zero p_div (e_succ e5) e_zero
+ | Arith_div1 : forall (e1 e2 e4 e3:e),
+     eq e1 p_minus e2 e3 ->
+     eq e3 p_div e2 e4 ->
+     eq e1 p_div e2 (e_succ e4).
 
 (* defns L *)
 Inductive L_exp : G -> e -> Prop :=    (* defn L_exp *)
  | L_exp_var : forall (G5:G) (x5:x),
       In  x5   G5  ->
      L_exp G5 (e_var_f x5)
+ | L_exp_zero : forall (G5:G),
+     L_exp G5 e_zero
+ | L_exp_succ : forall (G5:G) (e5:e),
+     L_exp G5 e5 ->
+     L_exp G5 (e_succ e5)
  | L_exp_app : forall (G5:G) (e1 e2:e),
      L_exp G5 e1 ->
      L_exp G5 e2 ->
      L_exp G5 (e_app e1 e2)
+ | L_exp_prim : forall (G5:G) (e1:e) (p5:p) (e2:e),
+     L_exp G5 e1 ->
+     L_exp G5 e2 ->
+     L_exp G5 (e_prim e1 p5 e2)
  | L_exp_lam : forall (L:vars) (G5:G) (e5:e),
       ( forall x5 , x5 \notin  L  -> L_exp  ( x5  ::  G5 )   ( open_e_wrt_e e5 (e_var_f x5) )  )  ->
      L_exp G5 (e_lam e5)
-with eq : G -> e -> e -> Prop :=    (* defn eq *)
- | L_eq_id : forall (G5:G) (e5:e),
+ | L_exp_fix : forall (L:vars) (G5:G) (e5:e),
+      ( forall x5 , x5 \notin  L  -> L_exp  ( x5  ::  G5 )   ( open_e_wrt_e e5 (e_var_f x5) )  )  ->
+     L_exp G5 (e_fix e5)
+ | L_exp_ifz : forall (L:vars) (G5:G) (e_5 e0 e1:e),
+     L_exp G5 e_5 ->
+     L_exp G5 e0 ->
+      ( forall x5 , x5 \notin  L  -> L_exp  ( x5  ::  G5 )   ( open_e_wrt_e e1 (e_var_f x5) )  )  ->
+     L_exp G5 (e_ifz e_5 e0 e1)
+with L_eq : G -> e -> e -> Prop :=    (* defn L_eq *)
+ | L_eq_refl : forall (G5:G) (e5:e),
      L_exp G5 e5 ->
-     eq G5 e5 e5
+     L_eq G5 e5 e5
  | L_eq_comm : forall (G5:G) (e' e5:e),
-     eq G5 e5 e' ->
-     eq G5 e' e5
+     L_eq G5 e5 e' ->
+     L_eq G5 e' e5
  | L_eq_trans : forall (G5:G) (e5 e'' e':e),
-     eq G5 e5 e' ->
-     eq G5 e' e'' ->
-     eq G5 e5 e''
- | L_eq_app : forall (G5:G) (e1 e2 e1' e2':e),
-     eq G5 e1 e1' ->
-     eq G5 e2 e2' ->
-     eq G5 (e_app e1 e2) (e_app e1' e2')
- | L_eq_lam : forall (L:vars) (G5:G) (e5 e':e),
-      ( forall x5 , x5 \notin  L  -> eq  ( x5  ::  G5 )   ( open_e_wrt_e e5 (e_var_f x5) )   ( open_e_wrt_e e' (e_var_f x5) )  )  ->
-     eq G5 (e_lam e5) (e_lam e')
- | L_eq_abs : forall (L:vars) (G5:G) (e2 e1:e),
+     L_eq G5 e5 e' ->
+     L_eq G5 e' e'' ->
+     L_eq G5 e5 e''
+ | L_eq_app' : forall (G5:G) (e1 e2 e1' e2':e),
+     L_eq G5 e1 e1' ->
+     L_eq G5 e2 e2' ->
+     L_eq G5 (e_app e1 e2) (e_app e1' e2')
+ | L_eq_prim' : forall (G5:G) (e1:e) (p5:p) (e2 e1' e2':e),
+     L_eq G5 e1 e1' ->
+     L_eq G5 e2 e2' ->
+     L_eq G5 (e_prim e1 p5 e2) (e_prim e1' p5 e2')
+ | L_eq_lam' : forall (L:vars) (G5:G) (e5 e':e),
+      ( forall x5 , x5 \notin  L  -> L_eq  ( x5  ::  G5 )   ( open_e_wrt_e e5 (e_var_f x5) )   ( open_e_wrt_e e' (e_var_f x5) )  )  ->
+     L_eq G5 (e_lam e5) (e_lam e')
+ | L_eq_fix' : forall (L:vars) (G5:G) (e5 e':e),
+      ( forall x5 , x5 \notin  L  -> L_eq  ( x5  ::  G5 )   ( open_e_wrt_e e5 (e_var_f x5) )   ( open_e_wrt_e e' (e_var_f x5) )  )  ->
+     L_eq G5 (e_fix e5) (e_fix e')
+ | L_eq_ifz' : forall (L:vars) (G5:G) (e_5 e0 e1 e' e0' e1':e),
+     L_eq G5 e_5 e' ->
+     L_eq G5 e0 e0' ->
+      ( forall x5 , x5 \notin  L  -> L_eq  ( x5  ::  G5 )   ( open_e_wrt_e e1 (e_var_f x5) )   ( open_e_wrt_e e1' (e_var_f x5) )  )  ->
+     L_eq G5 (e_ifz e_5 e0 e1) (e_ifz e' e0' e1')
+ | L_eq_app : forall (L:vars) (G5:G) (e2 e1:e),
       ( forall x5 , x5 \notin  L  -> L_exp  ( x5  ::  G5 )   ( open_e_wrt_e e2 (e_var_f x5) )  )  ->
      L_exp G5 e1 ->
-     eq G5 (e_app  ( (e_lam e2) )  e1)  (open_e_wrt_e  e2   e1 ) .
+     L_eq G5 (e_app  ( (e_lam e2) )  e1)  (open_e_wrt_e  e2   e1 ) 
+ | L_eq_prim : forall (G5:G) (e1:e) (p5:p) (e2 e3:e),
+     eq e1 p5 e2 e3 ->
+     L_eq G5 (e_prim e1 p5 e2) e3
+ | L_eq_fix : forall (L:vars) (G5:G) (e5:e),
+      ( forall x5 , x5 \notin  L  -> L_exp  ( x5  ::  G5 )   ( open_e_wrt_e e5 (e_var_f x5) )  )  ->
+     L_eq G5 (e_fix e5)  (open_e_wrt_e  e5   (e_fix e5) ) 
+ | L_eq_ifz0 : forall (G5:G) (e0 e1:e),
+     lc_e (e_ifz e_zero e0 e1) ->
+     L_exp G5 e0 ->
+     L_eq G5 (e_ifz e_zero e0 e1) e0
+ | L_eq_ifz1 : forall (L:vars) (G5:G) (e_5 e0 e1:e),
+     lc_e e0 ->
+     L_exp G5 e_5 ->
+      ( forall x5 , x5 \notin  L  -> L_exp  ( x5  ::  G5 )   ( open_e_wrt_e e1 (e_var_f x5) )  )  ->
+     L_eq G5 (e_ifz (e_succ e_5) e0 e1)  (open_e_wrt_e  e1   e_5 ) .
 
 (* defns K *)
 Inductive K_exp : G -> e -> Prop :=    (* defn K_exp *)
  | K_exp_var : forall (G5:G) (x5:x),
       In  x5   G5  ->
      K_exp G5 (e_var_f x5)
+ | K_exp_zero : forall (G5:G),
+     K_exp G5 e_zero
+ | K_exp_succ : forall (G5:G) (e5:e),
+     K_exp G5 e5 ->
+     K_exp G5 (e_succ e5)
  | K_exp_app : forall (G5:G) (e1 e2:e),
      K_exp G5 e1 ->
      K_exp G5 e2 ->
      K_exp G5 (e_app e1 e2)
+ | K_exp_prim : forall (G5:G) (e1:e) (p5:p) (e2:e),
+     K_exp G5 e1 ->
+     K_exp G5 e2 ->
+     K_exp G5 (e_prim e1 p5 e2)
  | K_exp_lam : forall (L:vars) (G5:G) (e5:e),
       ( forall x5 , x5 \notin  L  -> K_exp  ( x5  ::  G5 )   ( open_e_wrt_e e5 (e_var_f x5) )  )  ->
      K_exp G5 (e_lam e5)
+ | K_exp_fix : forall (L:vars) (G5:G) (e5:e),
+      ( forall x5 , x5 \notin  L  -> K_exp  ( x5  ::  G5 )   ( open_e_wrt_e e5 (e_var_f x5) )  )  ->
+     K_exp G5 (e_fix e5)
+ | K_exp_ifz : forall (L:vars) (G5:G) (e_5 e0 e1:e),
+     K_exp G5 e_5 ->
+     K_exp G5 e0 ->
+      ( forall x5 , x5 \notin  L  -> K_exp  ( x5  ::  G5 )   ( open_e_wrt_e e1 (e_var_f x5) )  )  ->
+     K_exp G5 (e_ifz e_5 e0 e1)
+ | K_exp_let : forall (L:vars) (G5:G) (e5 e':e),
+     K_exp G5 e5 ->
+      ( forall x5 , x5 \notin  L  -> K_exp  ( x5  ::  G5 )   ( open_e_wrt_e e' (e_var_f x5) )  )  ->
+     K_exp G5 (e_let e5 e')
  | K_exp_halt : forall (G5:G) (e5:e),
      K_exp G5 e5 ->
      K_exp G5 (e_halt e5)
 with step : G -> e -> e -> Prop :=    (* defn step *)
- | K_step_abs : forall (L:vars) (G5:G) (e2 e1:e),
+ | K_step_app : forall (L:vars) (G5:G) (e2 e1:e),
       ( forall x5 , x5 \notin  L  -> K_exp  ( x5  ::  G5 )   ( open_e_wrt_e e2 (e_var_f x5) )  )  ->
      K_exp G5 e1 ->
-     step G5 (e_app  ( (e_lam e2) )  e1)  (open_e_wrt_e  e2   e1 ) .
+     step G5 (e_app  ( (e_lam e2) )  e1)  (open_e_wrt_e  e2   e1 ) 
+ | K_step_prim : forall (G5:G) (e1:e) (p5:p) (e2 e3:e),
+     eq e1 p5 e2 e3 ->
+     step G5 (e_prim e1 p5 e2) e3
+ | K_step_fix : forall (L:vars) (G5:G) (e5:e),
+      ( forall x5 , x5 \notin  L  -> K_exp  ( x5  ::  G5 )   ( open_e_wrt_e e5 (e_var_f x5) )  )  ->
+     step G5 (e_fix e5)  (open_e_wrt_e  e5   (e_fix e5) ) 
+ | K_step_ifz0 : forall (G5:G) (e0 e1:e),
+     lc_e (e_ifz e_zero e0 e1) ->
+     K_exp G5 e0 ->
+     step G5 (e_ifz e_zero e0 e1) e0
+ | K_step_ifz1 : forall (L:vars) (G5:G) (e_5 e0 e1:e),
+     lc_e e0 ->
+     K_exp G5 e_5 ->
+      ( forall x5 , x5 \notin  L  -> K_exp  ( x5  ::  G5 )   ( open_e_wrt_e e1 (e_var_f x5) )  )  ->
+     step G5 (e_ifz (e_succ e_5) e0 e1)  (open_e_wrt_e  e1   e_5 ) .
 
 
 (** infrastructure *)
-Hint Constructors L_exp eq K_exp step lc_e.
+Hint Constructors val eq L_exp L_eq K_exp step lc_e.
 
 

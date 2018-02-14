@@ -5,11 +5,11 @@ SED     = 's/Metatheory/Metalib.Metatheory/g;s/LibLNgen/Metalib.LibLNgen/g'
 
 FILES = ucps_ott.v ucps_inf.v
 
-all: Makefile.coq ucps.pdf
+all: Makefile.coq $(FILES) ucps.pdf
 	$(MAKE) -f $<
 
-Makefile.coq: $(FILES)
-	coq_makefile -Q . FTop $(FILES) -o Makefile.coq
+Makefile.coq: _CoqProject
+	coq_makefile -f $< -o $@
 
 %_ott.v: %.ott
 	$(OTT_COQ) -o $@ $<

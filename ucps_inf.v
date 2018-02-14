@@ -15,17 +15,29 @@ Require Export FTop.ucps_ott.
 (* *********************************************************************** *)
 (** * Induction principles for nonterminals *)
 
+Scheme p_ind' := Induction for p Sort Prop.
+
+Definition p_mutind :=
+  fun H1 H2 H3 H4 H5 =>
+  p_ind' H1 H2 H3 H4 H5.
+
+Scheme p_rec' := Induction for p Sort Set.
+
+Definition p_mutrec :=
+  fun H1 H2 H3 H4 H5 =>
+  p_rec' H1 H2 H3 H4 H5.
+
 Scheme e_ind' := Induction for e Sort Prop.
 
 Definition e_mutind :=
-  fun H1 H2 H3 H4 H5 H6 =>
-  e_ind' H1 H2 H3 H4 H5 H6.
+  fun H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 =>
+  e_ind' H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12.
 
 Scheme e_rec' := Induction for e Sort Set.
 
 Definition e_mutrec :=
-  fun H1 H2 H3 H4 H5 H6 =>
-  e_rec' H1 H2 H3 H4 H5 H6.
+  fun H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 =>
+  e_rec' H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12.
 
 
 (* *********************************************************************** *)
@@ -35,8 +47,14 @@ Fixpoint close_e_wrt_e_rec (n1 : nat) (x1 : x) (e1 : e) {struct e1} : e :=
   match e1 with
     | e_var_f x2 => if (x1 == x2) then (e_var_b n1) else (e_var_f x2)
     | e_var_b n2 => if (lt_ge_dec n2 n1) then (e_var_b n2) else (e_var_b (S n2))
-    | e_lam e2 => e_lam (close_e_wrt_e_rec (S n1) x1 e2)
+    | e_zero => e_zero
+    | e_succ e2 => e_succ (close_e_wrt_e_rec n1 x1 e2)
     | e_app e2 e3 => e_app (close_e_wrt_e_rec n1 x1 e2) (close_e_wrt_e_rec n1 x1 e3)
+    | e_prim e2 p1 e3 => e_prim (close_e_wrt_e_rec n1 x1 e2) p1 (close_e_wrt_e_rec n1 x1 e3)
+    | e_lam e2 => e_lam (close_e_wrt_e_rec (S n1) x1 e2)
+    | e_fix e2 => e_fix (close_e_wrt_e_rec (S n1) x1 e2)
+    | e_ifz e2 e3 e4 => e_ifz (close_e_wrt_e_rec n1 x1 e2) (close_e_wrt_e_rec n1 x1 e3) (close_e_wrt_e_rec (S n1) x1 e4)
+    | e_let e2 e3 => e_let (close_e_wrt_e_rec n1 x1 e2) (close_e_wrt_e_rec (S n1) x1 e3)
     | e_halt e2 => e_halt (close_e_wrt_e_rec n1 x1 e2)
   end.
 
@@ -46,12 +64,26 @@ Definition close_e_wrt_e x1 e1 := close_e_wrt_e_rec 0 x1 e1.
 (* *********************************************************************** *)
 (** * Size *)
 
+Fixpoint size_p (p1 : p) {struct p1} : nat :=
+  match p1 with
+    | p_plus => 1
+    | p_minus => 1
+    | p_mult => 1
+    | p_div => 1
+  end.
+
 Fixpoint size_e (e1 : e) {struct e1} : nat :=
   match e1 with
     | e_var_f x1 => 1
     | e_var_b n1 => 1
-    | e_lam e2 => 1 + (size_e e2)
+    | e_zero => 1
+    | e_succ e2 => 1 + (size_e e2)
     | e_app e2 e3 => 1 + (size_e e2) + (size_e e3)
+    | e_prim e2 p1 e3 => 1 + (size_e e2) + (size_p p1) + (size_e e3)
+    | e_lam e2 => 1 + (size_e e2)
+    | e_fix e2 => 1 + (size_e e2)
+    | e_ifz e2 e3 e4 => 1 + (size_e e2) + (size_e e3) + (size_e e4)
+    | e_let e2 e3 => 1 + (size_e e2) + (size_e e3)
     | e_halt e2 => 1 + (size_e e2)
   end.
 
@@ -67,13 +99,34 @@ Inductive degree_e_wrt_e : nat -> e -> Prop :=
   | degree_wrt_e_e_var_b : forall n1 n2,
     lt n2 n1 ->
     degree_e_wrt_e n1 (e_var_b n2)
-  | degree_wrt_e_e_lam : forall n1 e1,
-    degree_e_wrt_e (S n1) e1 ->
-    degree_e_wrt_e n1 (e_lam e1)
+  | degree_wrt_e_e_zero : forall n1,
+    degree_e_wrt_e n1 (e_zero)
+  | degree_wrt_e_e_succ : forall n1 e1,
+    degree_e_wrt_e n1 e1 ->
+    degree_e_wrt_e n1 (e_succ e1)
   | degree_wrt_e_e_app : forall n1 e1 e2,
     degree_e_wrt_e n1 e1 ->
     degree_e_wrt_e n1 e2 ->
     degree_e_wrt_e n1 (e_app e1 e2)
+  | degree_wrt_e_e_prim : forall n1 e1 p1 e2,
+    degree_e_wrt_e n1 e1 ->
+    degree_e_wrt_e n1 e2 ->
+    degree_e_wrt_e n1 (e_prim e1 p1 e2)
+  | degree_wrt_e_e_lam : forall n1 e1,
+    degree_e_wrt_e (S n1) e1 ->
+    degree_e_wrt_e n1 (e_lam e1)
+  | degree_wrt_e_e_fix : forall n1 e1,
+    degree_e_wrt_e (S n1) e1 ->
+    degree_e_wrt_e n1 (e_fix e1)
+  | degree_wrt_e_e_ifz : forall n1 e1 e2 e3,
+    degree_e_wrt_e n1 e1 ->
+    degree_e_wrt_e n1 e2 ->
+    degree_e_wrt_e (S n1) e3 ->
+    degree_e_wrt_e n1 (e_ifz e1 e2 e3)
+  | degree_wrt_e_e_let : forall n1 e1 e2,
+    degree_e_wrt_e n1 e1 ->
+    degree_e_wrt_e (S n1) e2 ->
+    degree_e_wrt_e n1 (e_let e1 e2)
   | degree_wrt_e_e_halt : forall n1 e1,
     degree_e_wrt_e n1 e1 ->
     degree_e_wrt_e n1 (e_halt e1).
@@ -81,8 +134,8 @@ Inductive degree_e_wrt_e : nat -> e -> Prop :=
 Scheme degree_e_wrt_e_ind' := Induction for degree_e_wrt_e Sort Prop.
 
 Definition degree_e_wrt_e_mutind :=
-  fun H1 H2 H3 H4 H5 H6 =>
-  degree_e_wrt_e_ind' H1 H2 H3 H4 H5 H6.
+  fun H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 =>
+  degree_e_wrt_e_ind' H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12.
 
 Hint Constructors degree_e_wrt_e : core lngen.
 
@@ -93,13 +146,34 @@ Hint Constructors degree_e_wrt_e : core lngen.
 Inductive lc_set_e : e -> Set :=
   | lc_set_e_var_f : forall x1,
     lc_set_e (e_var_f x1)
-  | lc_set_e_lam : forall e1,
-    (forall x1 : x, lc_set_e (open_e_wrt_e e1 (e_var_f x1))) ->
-    lc_set_e (e_lam e1)
+  | lc_set_e_zero :
+    lc_set_e (e_zero)
+  | lc_set_e_succ : forall e1,
+    lc_set_e e1 ->
+    lc_set_e (e_succ e1)
   | lc_set_e_app : forall e1 e2,
     lc_set_e e1 ->
     lc_set_e e2 ->
     lc_set_e (e_app e1 e2)
+  | lc_set_e_prim : forall e1 p1 e2,
+    lc_set_e e1 ->
+    lc_set_e e2 ->
+    lc_set_e (e_prim e1 p1 e2)
+  | lc_set_e_lam : forall e1,
+    (forall x1 : x, lc_set_e (open_e_wrt_e e1 (e_var_f x1))) ->
+    lc_set_e (e_lam e1)
+  | lc_set_e_fix : forall e1,
+    (forall x1 : x, lc_set_e (open_e_wrt_e e1 (e_var_f x1))) ->
+    lc_set_e (e_fix e1)
+  | lc_set_e_ifz : forall e1 e2 e3,
+    lc_set_e e1 ->
+    lc_set_e e2 ->
+    (forall x1 : x, lc_set_e (open_e_wrt_e e3 (e_var_f x1))) ->
+    lc_set_e (e_ifz e1 e2 e3)
+  | lc_set_e_let : forall e1 e2,
+    lc_set_e e1 ->
+    (forall x1 : x, lc_set_e (open_e_wrt_e e2 (e_var_f x1))) ->
+    lc_set_e (e_let e1 e2)
   | lc_set_e_halt : forall e1,
     lc_set_e e1 ->
     lc_set_e (e_halt e1).
@@ -107,20 +181,20 @@ Inductive lc_set_e : e -> Set :=
 Scheme lc_e_ind' := Induction for lc_e Sort Prop.
 
 Definition lc_e_mutind :=
-  fun H1 H2 H3 H4 H5 =>
-  lc_e_ind' H1 H2 H3 H4 H5.
+  fun H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 =>
+  lc_e_ind' H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11.
 
 Scheme lc_set_e_ind' := Induction for lc_set_e Sort Prop.
 
 Definition lc_set_e_mutind :=
-  fun H1 H2 H3 H4 H5 =>
-  lc_set_e_ind' H1 H2 H3 H4 H5.
+  fun H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 =>
+  lc_set_e_ind' H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11.
 
 Scheme lc_set_e_rec' := Induction for lc_set_e Sort Set.
 
 Definition lc_set_e_mutrec :=
-  fun H1 H2 H3 H4 H5 =>
-  lc_set_e_rec' H1 H2 H3 H4 H5.
+  fun H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 =>
+  lc_set_e_rec' H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11.
 
 Hint Constructors lc_e : core lngen.
 
@@ -157,6 +231,25 @@ Ltac default_case_split ::=
 
 Ltac default_auto ::= auto with arith lngen; tauto.
 Ltac default_autorewrite ::= fail.
+
+(* begin hide *)
+
+Lemma size_p_min_mutual :
+(forall p1, 1 <= size_p p1).
+Proof.
+apply_mutual_ind p_mutind;
+default_simp.
+Qed.
+
+(* end hide *)
+
+Lemma size_p_min :
+forall p1, 1 <= size_p p1.
+Proof.
+pose proof size_p_min_mutual as H; intuition eauto.
+Qed.
+
+Hint Resolve size_p_min : lngen.
 
 (* begin hide *)
 
@@ -716,6 +809,12 @@ Qed.
 
 Hint Resolve lc_e_of_degree : lngen.
 
+Ltac p_lc_exists_tac :=
+  repeat (match goal with
+            | H : _ |- _ =>
+              fail 1
+          end).
+
 Ltac e_lc_exists_tac :=
   repeat (match goal with
             | H : _ |- _ =>
@@ -730,10 +829,52 @@ Proof.
 intros; e_lc_exists_tac; eauto with lngen.
 Qed.
 
+Lemma lc_e_fix_exists :
+forall x1 e1,
+  lc_e (open_e_wrt_e e1 (e_var_f x1)) ->
+  lc_e (e_fix e1).
+Proof.
+intros; e_lc_exists_tac; eauto with lngen.
+Qed.
+
+Lemma lc_e_ifz_exists :
+forall x1 e1 e2 e3,
+  lc_e e1 ->
+  lc_e e2 ->
+  lc_e (open_e_wrt_e e3 (e_var_f x1)) ->
+  lc_e (e_ifz e1 e2 e3).
+Proof.
+intros; e_lc_exists_tac; eauto with lngen.
+Qed.
+
+Lemma lc_e_let_exists :
+forall x1 e1 e2,
+  lc_e e1 ->
+  lc_e (open_e_wrt_e e2 (e_var_f x1)) ->
+  lc_e (e_let e1 e2).
+Proof.
+intros; e_lc_exists_tac; eauto with lngen.
+Qed.
+
 Hint Extern 1 (lc_e (e_lam _)) =>
   let x1 := fresh in
   pick_fresh x1;
   apply (lc_e_lam_exists x1).
+
+Hint Extern 1 (lc_e (e_fix _)) =>
+  let x1 := fresh in
+  pick_fresh x1;
+  apply (lc_e_fix_exists x1).
+
+Hint Extern 1 (lc_e (e_ifz _ _ _)) =>
+  let x1 := fresh in
+  pick_fresh x1;
+  apply (lc_e_ifz_exists x1).
+
+Hint Extern 1 (lc_e (e_let _ _)) =>
+  let x1 := fresh in
+  pick_fresh x1;
+  apply (lc_e_let_exists x1).
 
 Lemma lc_body_e_wrt_e :
 forall e1 e2,
@@ -761,6 +902,36 @@ default_simp.
 Qed.
 
 Hint Resolve lc_body_e_lam_1 : lngen.
+
+Lemma lc_body_e_fix_1 :
+forall e1,
+  lc_e (e_fix e1) ->
+  body_e_wrt_e e1.
+Proof.
+default_simp.
+Qed.
+
+Hint Resolve lc_body_e_fix_1 : lngen.
+
+Lemma lc_body_e_ifz_3 :
+forall e1 e2 e3,
+  lc_e (e_ifz e1 e2 e3) ->
+  body_e_wrt_e e3.
+Proof.
+default_simp.
+Qed.
+
+Hint Resolve lc_body_e_ifz_3 : lngen.
+
+Lemma lc_body_e_let_2 :
+forall e1 e2,
+  lc_e (e_let e1 e2) ->
+  body_e_wrt_e e2.
+Proof.
+default_simp.
+Qed.
+
+Hint Resolve lc_body_e_let_2 : lngen.
 
 (* begin hide *)
 
@@ -819,7 +990,8 @@ default_simp;
 try solve [assert False by default_simp; tauto];
 (* non-trivial cases *)
 constructor; default_simp;
-try first [apply lc_set_e_of_lc_e];
+try first [apply lc_set_e_of_lc_e
+ | apply lc_set_p_of_lc_p];
 default_simp; eapply_first_lt_hyp;
 (* instantiate the size *)
 match goal with
@@ -1451,6 +1623,39 @@ default_simp.
 Qed.
 
 Hint Resolve subst_e_e_lam : lngen.
+
+Lemma subst_e_e_fix :
+forall x2 e2 e1 x1,
+  lc_e e1 ->
+  x2 `notin` fv_e e1 `union` fv_e e2 `union` singleton x1 ->
+  subst_e e1 x1 (e_fix e2) = e_fix (close_e_wrt_e x2 (subst_e e1 x1 (open_e_wrt_e e2 (e_var_f x2)))).
+Proof.
+default_simp.
+Qed.
+
+Hint Resolve subst_e_e_fix : lngen.
+
+Lemma subst_e_e_ifz :
+forall x2 e2 e3 e4 e1 x1,
+  lc_e e1 ->
+  x2 `notin` fv_e e1 `union` fv_e e4 `union` singleton x1 ->
+  subst_e e1 x1 (e_ifz e2 e3 e4) = e_ifz (subst_e e1 x1 e2) (subst_e e1 x1 e3) (close_e_wrt_e x2 (subst_e e1 x1 (open_e_wrt_e e4 (e_var_f x2)))).
+Proof.
+default_simp.
+Qed.
+
+Hint Resolve subst_e_e_ifz : lngen.
+
+Lemma subst_e_e_let :
+forall x2 e2 e3 e1 x1,
+  lc_e e1 ->
+  x2 `notin` fv_e e1 `union` fv_e e3 `union` singleton x1 ->
+  subst_e e1 x1 (e_let e2 e3) = e_let (subst_e e1 x1 e2) (close_e_wrt_e x2 (subst_e e1 x1 (open_e_wrt_e e3 (e_var_f x2)))).
+Proof.
+default_simp.
+Qed.
+
+Hint Resolve subst_e_e_let : lngen.
 
 (* begin hide *)
 
