@@ -1,0 +1,119 @@
+metavar x ::= {{ com variables }}
+{{ repr-locally-nameless }}
+
+grammar
+e :: 'e_' ::= {{ com expressions }}
+| x            ::   :: var
+| \ x . e      ::   :: lam (+ bind x in e +)
+| e1 e2        ::   :: app
+| halt e       ::   :: halt
+| ( e )        :: S :: par {{ coq ([[e]]) }}
+| [ e / x ] e' :: M :: sub {{ coq (open_e_wrt_e [[x e']] [[e]]) }}
+
+substitutions
+  single e x :: subst
+
+freevars
+  e x :: fv
+
+grammar
+G {{ tex \Gamma }} :: 'g_' ::= {{ com contexts }} {{ coq list x }}
+|          :: :: empty {{ coq []               }}
+| G , x ok :: :: cons  {{ coq ([[x]] :: [[G]]) }}
+
+terminals :: terminals_ ::=
+| ok  :: :: ok         {{ tex \mathsf{ok}      }}
+| \   :: :: lambda     {{ tex \lambda          }}
+| in  :: :: in         {{ tex \in              }}
+| |-L :: :: turnstileL {{ tex \vdash_\Lambda   }}
+| |-K :: :: turnstileK {{ tex \vdash_\mathrm K }}
+| =   :: :: equiv      {{ tex \equiv           }}
+| |-> :: :: mapsto     {{ tex \mapsto          }}
+
+formula :: formula_ ::=
+| judgement :: :: judgement
+| x in G    :: :: inG {{ coq In [[x]] [[G]] }}
+
+defns
+L :: '' ::=
+
+defn
+G |-L e ok :: :: L_exp :: 'L_exp_' {{ com well-formedness }}
+by
+
+x in G
+---------- :: var
+G |-L x ok
+
+G |-L e1 ok
+G |-L e2 ok
+-------------- :: app
+G |-L e1 e2 ok
+
+G , x ok |-L e ok
+----------------- :: lam
+G |-L \ x . e ok
+
+defn
+G |-L e1 = e2 :: :: eq :: 'L_eq_' {{ com equivalence }}
+by
+
+G |-L e ok
+----------- :: id
+G |-L e = e
+
+G |-L e = e'
+------------ :: comm
+G |-L e' = e
+
+G |-L e  = e'
+G |-L e' = e''
+-------------- :: trans
+G |-L e  = e''
+
+G |-L e1 = e1'
+G |-L e2 = e2'
+--------------------- :: app
+G |-L e1 e2 = e1' e2'
+
+G , x ok |-L e = e'
+------------------------ :: lam
+G |-L \ x . e = \ x . e'
+
+G , x ok |-L e2 ok
+G |-L e1 ok
+------------------------------------- :: abs
+G |-L ( \ x . e2 ) e1 = [ e1 / x ] e2
+
+defns
+K :: '' ::=
+
+defn
+G |-K e ok :: :: K_exp :: 'K_exp_' {{ com well-formedness }}
+by
+
+x in G
+---------- :: var
+G |-K x ok
+
+G |-K e1 ok
+G |-K e2 ok
+-------------- :: app
+G |-K e1 e2 ok
+
+G , x ok |-K e ok
+----------------- :: lam
+G |-K \ x . e ok
+
+G |-K e ok
+--------------- :: halt
+G |-K halt e ok
+
+defn
+G |-K e1 |-> e2 :: :: step :: 'K_step_' {{ com reduction }}
+by
+
+G , x ok |-K e2 ok
+G |-K e1 ok
+--------------------------------------- :: abs
+G |-K ( \ x . e2 ) e1 |-> [ e1 / x ] e2
