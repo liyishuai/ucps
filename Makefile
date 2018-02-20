@@ -5,7 +5,7 @@ SED     = 's/Metatheory/Metalib.Metatheory/g;s/LibLNgen/Metalib.LibLNgen/g'
 
 FILES = ucps_ott.v ucps_inf.v
 
-all: Makefile.coq $(FILES) ucps.pdf
+all: Makefile.coq $(FILES) note.pdf
 	$(MAKE) -f $<
 
 Makefile.coq: _CoqProject
@@ -21,14 +21,17 @@ Makefile.coq: _CoqProject
 %.pdf: %.tex
 	latexmk -pdf $*
 
-%.tex: %.ott
+note.pdf: ucps.tex
+
+ucps.tex: ucps.ott
 	$(OTT_TEX) -o $@ $<
+	sed -i "" -e "/begin.document/,/end.document/d" ucps.tex
 
 clean: Makefile.coq
 	$(MAKE) -f $< clean
-	latexmk -c -f ucps
+	latexmk -c -f ucps note
 
 distclean: clean
-	latexmk -C -f ucps
+	latexmk -C -f ucps note
 	rm -f ucps*.v*
 	rm -f Makefile.coq*
