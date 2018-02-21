@@ -5,7 +5,12 @@
 
 \newcommand\fun\lambda
 \newcommand{\K}[1]{\llbracket #1\rrbracket}
-\newcommand{\kdef}[2]{&\K{#1}~K&=\quad&#2}
+\newcommand{\EK}[1]{\mathcal E\K{#1}}
+\newcommand{\SK}[1]{\mathcal S\K{#1}}
+\newcommand{\TK}[1]{\mathcal T\K{#1}}
+\newcommand{\Edef}[2]{&\EK{#1}&=\quad&#2}
+\newcommand{\sdef}[2]{&\SK{#1}~K&=\quad&#2}
+\newcommand{\tdef}[2]{&\TK{#1}&=\quad&#2}
 
 \title{Continuation-Passing Style}
 \date{}
@@ -25,19 +30,23 @@
 \section*{Transformation}
 \subsection*{Call-by-value}
 \begin{align*}
-\kdef{x}{K~x}\\
-\kdef{\fun x.~e}{K~(\fun x~k.~\K{e}~k)}\\
-\kdef{t_0~t_1}{\K{t_0}~\K{t_1}~K}\\
-\kdef{t_0~s_1}{\K{s_1}~(\fun x_1.~\K{t_0}~x_1~K)}\\
-\kdef{s_0~t_1}{\K{s_0}~(\fun x_0.~x_0~\K{t_1}~K)}\\
-\kdef{s_0~s_1}{\K{s_0}~(\fun x_0.~\K{s_1}~(\fun x_1.~x_0~x_1~K))}
+\Edef{t}{\fun k.~k~\TK{t}}\\
+\Edef{s}{\SK{s}}\\
+\sdef{t_0~t_1}{\TK{t_0}~\TK{t_1}~K}\\
+\sdef{t_0~s_1}{\SK{s_1}~(\fun x_1.~\TK{t_0}~x_1~K)}\\
+\sdef{s_0~t_1}{\SK{s_0}~(\fun x_0.~x_0~\TK{t_1}~K)}\\
+\sdef{s_0~s_1}{\SK{s_0}~(\fun x_0.~\SK{s_1}~(\fun x_1.~x_0~x_1~K))}\\
+\tdef{x}{x}\\
+\tdef{\fun x.~e}{\fun x.~\EK{e}}
 \end{align*}
 
 \subsection*{Call-by-name}
 \begin{align*}
-\kdef{x}{K~x}\\
-\kdef{\fun x.~e}{K~(\fun x~k.~\K{e}~k)}\\
-\kdef{t_0~e_1}{\K{t_0}~\K{e_1}~K}\\
-\kdef{s_0~e_1}{\K{s_0}~(\fun x_0.~x_0~\K{e_1}~K)}
+\Edef{t}{\fun k.~k~\TK{t}}\\
+\Edef{s}{\SK{s}}\\
+\sdef{t_0~e_1}{\TK{t_0}~\EK{e_1}~K}\\
+\sdef{s_0~e_1}{\SK{s_0}~(\fun x_0.~x_0~\EK{e_1}~K)}\\
+\tdef{x}{x}\\
+\tdef{\fun x.~e}{\fun x.~\EK{e}}
 \end{align*}
 \end{document}
