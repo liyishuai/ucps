@@ -31,7 +31,7 @@
 \subsection*{Call-by-value}
 \begin{align*}
 \Edef{t}{\fun k.~k~\TK{t}}\\
-\Edef{s}{\SK{s}}\\
+\Edef{s}{\fun k.~\SK{s}~k}\\
 \sdef{t_0~t_1}{\TK{t_0}~\TK{t_1}~K}\\
 \sdef{t_0~s_1}{\SK{s_1}~(\fun x_1.~\TK{t_0}~x_1~K)}\\
 \sdef{s_0~t_1}{\SK{s_0}~(\fun x_0.~x_0~\TK{t_1}~K)}\\
@@ -43,7 +43,7 @@
 \subsection*{Call-by-name}
 \begin{align*}
 \Edef{t}{\fun k.~k~\TK{t}}\\
-\Edef{s}{\SK{s}}\\
+\Edef{s}{\fun k.~\SK{s}~k}\\
 \sdef{t_0~e_1}{\TK{t_0}~\EK{e_1}~K}\\
 \sdef{s_0~e_1}{\SK{s_0}~(\fun x_0.~x_0~\EK{e_1}~K)}\\
 \tdef{x}{x}\\
